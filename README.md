@@ -1,127 +1,176 @@
-# Hybrid RAG System with Memory and Tracing
+# Hybrid RAG System
 
-This project is a cutting-edge Retrieval-Augmented Generation (RAG) system leveraging advanced techniques in natural language processing (NLP), document retrieval, and conversational memory. It uses LangChain, DeepSeek R1, and Python to provide enhanced document-based Q&A functionality.
+This project is a Retrieval-Augmented Generation (RAG) system implemented using Python, LangChain, and the DeepSeek R1 model. It combines traditional retrieval techniques (BM25) with modern dense embeddings (FAISS) to build a highly efficient document retrieval and question-answering system.
+
+---
 
 ## Features
 
-- **Dynamic Context Awareness**: Provides accurate answers by combining BM25 and FAISS for efficient document retrieval.
-- **Conversational Memory**: Remembers the flow of interactions for a more personalized experience.
-- **Multiple File Support**: Upload and process multiple PDFs stored in the `data/` directory.
-- **Advanced Tracing and Analytics**: Monitor queries and errors with LangSmith.
-- **State-of-the-Art Tech**: Built with LangChain and the DeepSeek R1 model.
+### Current Features
+
+1. **Hybrid Retrieval**: Combines BM25 and FAISS for robust and accurate document retrieval.
+2. **Multi-PDF Support**: Users can upload multiple PDF files for processing, which are stored in a dedicated `data/` directory.
+3. **Streamlit UI**: A user-friendly interface for uploading files, asking questions, and viewing results.
+4. **Tracing and Analytics**: Integrated tracing with LangSmith to analyze performance and monitor usage.
+5. **Custom LLM Integration**: Uses the DeepSeek R1 model (via Ollama) for question answering.
+6. **Dynamic Context Handling**: Automatically handles and prepares context for queries.
+
+### Planned Features
+
+#### Enhanced Memory Features
+
+1. **Context-Aware Memory**: Implement dynamic context retention to remember the flow of conversations.
+   - Framework: LangChain's updated `ConversationBufferMemory` or `EntityMemory`.
+   - Use Case: Retaining context across multiple user queries for more coherent interactions.
+2. **User-Specific Memory**: Allow memory reset or persistence for different users.
+   - Framework: Redis or PostgreSQL for memory persistence across sessions.
+
+#### File Management
+
+1. **Support for Multiple File Formats**:
+   - Additional Formats: Microsoft Word, CSV, and image files (via Tesseract or Amazon Textract for OCR).
+   - Library: `python-docx` for Word, `pandas` for CSV, and `pytesseract` or AWS Textract for images.
+2. **File Listing UI**:
+   - Feature: A sidebar UI for managing uploaded files (view/delete).
+   - Library: Streamlit components (`st.sidebar` and `st.selectbox`).
+
+#### Advanced Tracing and Analytics
+
+1. **Usage Analytics**:
+   - Framework: LangSmith or OpenTelemetry.
+   - Metrics: Number of queries, response times, and user feedback.
+2. **Error Logging**:
+   - Framework: Sentry or Python's built-in `logging` library.
+   - Storage: Centralized logs for troubleshooting.
+
+#### API Integration
+
+1. **REST API**:
+   - Framework: FastAPI for building a RESTful API.
+   - Use Case: Exposing functionalities for external applications.
+
+#### Security Enhancements
+
+1. **Access Control**:
+   - Framework: FastAPI Users for authentication and role-based access.
+   - Feature: Secure endpoints for API access.
+2. **Data Encryption**:
+   - Library: `cryptography` for encrypting files and query results.
+
+#### Enhanced Retrieval
+
+1. **Advanced Retrieval Techniques**:
+   - Framework: DPR (Dense Passage Retrieval) using Hugging Face models.
+   - Improvement: Replace FAISS with Weaviate or Milvus for better vector storage and search.
+2. **Semantic Clustering**:
+   - Library: Scikit-learn for clustering similar documents.
+
+#### Performance Optimization
+
+1. **Parallel Processing**:
+   - Framework: `concurrent.futures` or `multiprocessing`.
+   - Use Case: Faster processing of large files.
+2. **Caching System**:
+   - Library: Redis or Memcached for caching embeddings and document chunks.
+
+#### Feedback System
+
+1. **User Feedback Loop**:
+   - Framework: Streamlit widgets for rating responses.
+   - Use Case: Improve system accuracy with user feedback.
+2. **Interactive Debugging**:
+   - Feature: Flag incorrect answers directly from the UI.
+
+#### Testing and CI/CD
+
+1. **Automated Testing**:
+   - Framework: Pytest for unit and integration tests.
+   - CI Tool: GitHub Actions for continuous integration.
+2. **Continuous Deployment**:
+   - Tool: Docker and AWS CodePipeline for seamless updates.
+
+#### Community Engagement
+
+1. **Knowledge Base**:
+   - Platform: GitBook or ReadTheDocs for user and developer documentation.
+   - Content: Guides, FAQs, and tutorials.
+2. **Open Source Contribution**:
+   - Platform: GitHub for hosting and collaboration.
+   - Feature: Contributor guidelines and issues for community involvement.
+
+---
 
 ## Installation
 
 ### Prerequisites
 
-Ensure you have Python 3.8 or higher installed.
+- Python 3.9+
+- Pip
+- Ollama installed ([installation guide](https://www.ollama.com)).
 
 ### Steps
 
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/yourusername/hybrid-rag-system.git
-   cd hybrid-rag-system
+   git clone https://github.com/your-repo/hybrid-rag.git
+   cd hybrid-rag
    ```
 
 2. Create and activate a virtual environment:
 
    ```bash
    python -m venv rag_env
-   source rag_env/bin/activate  # On Windows, use `rag_env\Scripts\activate`
+   source rag_env/bin/activate  # On Windows: rag_env\Scripts\activate
    ```
 
-3. Install the required Python libraries:
+3. Install dependencies:
 
    ```bash
    pip install -r requirements.txt
    ```
 
-4. Install Ollama:
-   Follow the instructions at [Ollama's Official Documentation](https://ollama.com/docs) to install the Ollama CLI.
-
-5. Pull the DeepSeek R1 model:
+4. Install Ollama and pull the DeepSeek R1 model:
 
    ```bash
+   # Install Ollama
+   brew install ollama  # macOS
+
+   # Pull the DeepSeek R1 model
    ollama pull deepseek-r1:1.5b
    ```
 
-6. Set up environment variables:
-
-   - Create a `.env` file in the project root.
-   - Add your LangSmith API key:
-     ```env
-     LANGSMITH_API_KEY=your_langsmith_api_key
-     ```
-
-7. Run the application:
+5. Run the Streamlit app:
    ```bash
    streamlit run app.py
    ```
 
+---
+
 ## Usage
 
-1. Upload multiple PDF files using the file uploader. The files will be stored in the `data/` directory.
-2. Ask questions in the text input box, and the system will retrieve relevant information from the uploaded documents.
-3. View responses and source documents directly in the Streamlit interface.
+1. Upload one or more PDF files via the Streamlit UI.
+2. Ask questions based on the uploaded documents.
+3. View responses and source documents.
 
-## ToDos
+---
 
-### Enhanced Memory Features
+## Contributing
 
-- **Context-Aware Memory**: Implement dynamic context retention so the system remembers the conversation's flow over multiple queries.
-- **User-Specific Memory**: Allow memory to reset or persist for different users to personalize the interaction.
+We welcome contributions! Please check the [Contributing Guidelines](CONTRIBUTING.md).
 
-### File Management
+---
 
-- **Multiple File Formats**: Support additional file types like Word documents, CSVs, or images (via OCR for text extraction).
-- **File Listing UI**: Add a sidebar that lists all uploaded files and allows users to manage (delete/view) them.
+## License
 
-### Advanced Tracing and Analytics
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-- **Usage Analytics**: Track the number of queries, response times, and user feedback on responses.
-- **Error Logging**: Store errors in a centralized log to troubleshoot issues more effectively.
-
-### API Integration
-
-- **REST API**: Expose core functionalities via a REST API using FastAPI for external integrations.
-
-### Security Enhancements
-
-- **Access Control**: Implement user authentication and role-based access to features using Auth0.
-- **Data Encryption**: Encrypt uploaded files and query results to enhance data privacy with PyCryptodome.
-
-### Enhanced Retrieval
-
-- **Hybrid Scoring System**: Improve the hybrid BM25 + FAISS system by adding Dense Passage Retrieval (DPR).
-- **Semantic Clustering**: Use HDBSCAN for clustering similar documents for better retrieval.
-
-### Performance Optimization
-
-- **Parallel Processing**: Use Ray for multi-threading to process large files faster.
-- **Caching System**: Implement Redis for caching embeddings or document chunks.
-
-### Feedback System
-
-- **Feedback Loop**: Allow users to rate responses to improve system accuracy over time.
-- **Interactive Debugging**: Let users report issues or flag incorrect answers directly from the UI.
-
-### Testing and CI/CD
-
-- **Automated Testing**: Add unit tests using Pytest and integration tests with LangChain's test utilities.
-- **Continuous Deployment**: Use GitHub Actions for CI/CD pipelines.
-
-### Community Engagement
-
-- **Knowledge Base**: Create a knowledge base or documentation portal with MkDocs for users and developers.
-- **Community Contributions**: Open source the project and invite external contributions.
+---
 
 ## References
 
-- [LangChain Documentation](https://langchain.com/)
-- [Ollama Documentation](https://ollama.com/docs)
+- [LangChain Documentation](https://docs.langchain.com/)
+- [DeepSeek R1 Model](https://www.ollama.com)
 - [Streamlit Documentation](https://docs.streamlit.io/)
-- [LangSmith](https://docs.langchain.com/docs/).
-
-Feel free to contribute to this project and suggest new features! If you encounter any issues, please open an issue in the GitHub repository.
+- [FAISS](https://github.com/facebookresearch/faiss)
+- [BM25](https://pypi.org/project/rank-bm25/)
