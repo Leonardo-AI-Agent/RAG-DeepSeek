@@ -1,185 +1,127 @@
-# Hybrid RAG System with Memory
+# Hybrid RAG System with Memory and Tracing
 
-This project is a **Hybrid Retrieval-Augmented Generation (RAG) System** powered by **BM25** and **FAISS**, allowing for efficient information retrieval and question answering on uploaded documents. The system is integrated with a language model and designed to handle PDF uploads, dynamic memory, and real-time tracing for debugging and analytics.
-
----
+This project is a cutting-edge Retrieval-Augmented Generation (RAG) system leveraging advanced techniques in natural language processing (NLP), document retrieval, and conversational memory. It uses LangChain, DeepSeek R1, and Python to provide enhanced document-based Q&A functionality.
 
 ## Features
 
-1. **Multi-Document Upload**: Upload multiple PDF files and store them in a designated `data/` directory.
-2. **Efficient Retrieval**: Hybrid scoring using BM25 and FAISS ensures accurate document retrieval.
-3. **Conversational QA**: Ask questions about the uploaded files and receive relevant, concise answers.
-4. **Dynamic Context Management**: Flexible context retention for improved conversational memory.
-5. **Tracing and Debugging**: Integrated LangSmith tracing for monitoring and debugging.
+- **Dynamic Context Awareness**: Provides accurate answers by combining BM25 and FAISS for efficient document retrieval.
+- **Conversational Memory**: Remembers the flow of interactions for a more personalized experience.
+- **Multiple File Support**: Upload and process multiple PDFs stored in the `data/` directory.
+- **Advanced Tracing and Analytics**: Monitor queries and errors with LangSmith.
+- **State-of-the-Art Tech**: Built with LangChain and the DeepSeek R1 model.
 
----
-
-## Getting Started
+## Installation
 
 ### Prerequisites
 
-- Python 3.9+
-- Pip package manager
-- An `.env` file with the following variables:
-  ```plaintext
-  OPENAI_API_KEY=<your_openai_api_key>
-  LANGSMITH_API_KEY=<your_langsmith_api_key>
-  ```
+Ensure you have Python 3.8 or higher installed.
 
-### Installation
+### Steps
 
 1. Clone the repository:
+
    ```bash
-   git clone <repository_url>
-   cd <repository_name>
+   git clone https://github.com/yourusername/hybrid-rag-system.git
+   cd hybrid-rag-system
    ```
-2. Install dependencies:
+
+2. Create and activate a virtual environment:
+
+   ```bash
+   python -m venv rag_env
+   source rag_env/bin/activate  # On Windows, use `rag_env\Scripts\activate`
+   ```
+
+3. Install the required Python libraries:
+
    ```bash
    pip install -r requirements.txt
    ```
-3. Run the application:
+
+4. Install Ollama:
+   Follow the instructions at [Ollama's Official Documentation](https://ollama.com/docs) to install the Ollama CLI.
+
+5. Pull the DeepSeek R1 model:
+
+   ```bash
+   ollama pull deepseek-r1:1.5b
+   ```
+
+6. Set up environment variables:
+
+   - Create a `.env` file in the project root.
+   - Add your LangSmith API key:
+     ```env
+     LANGSMITH_API_KEY=your_langsmith_api_key
+     ```
+
+7. Run the application:
    ```bash
    streamlit run app.py
    ```
 
----
+## Usage
 
-## TODO: Planned Improvements
+1. Upload multiple PDF files using the file uploader. The files will be stored in the `data/` directory.
+2. Ask questions in the text input box, and the system will retrieve relevant information from the uploaded documents.
+3. View responses and source documents directly in the Streamlit interface.
 
-### 1. **Enhanced Memory Features**
+## ToDos
 
-#### **Context-Aware Memory**
+### Enhanced Memory Features
 
-- **Description**: Implement dynamic context retention to remember the flow of conversations over multiple queries.
-- **Implementation**: Leverage LangChain's `ConversationBufferMemory` or `ConversationSummaryMemory`.
-- **References**: [LangChain Memory Docs](https://python.langchain.com/docs/modules/memory/)
+- **Context-Aware Memory**: Implement dynamic context retention so the system remembers the conversation's flow over multiple queries.
+- **User-Specific Memory**: Allow memory to reset or persist for different users to personalize the interaction.
 
-#### **User-Specific Memory**
+### File Management
 
-- **Description**: Allow memory to reset or persist for different users to personalize the interaction.
-- **Implementation**: Introduce user session identifiers and associate memory objects with users.
+- **Multiple File Formats**: Support additional file types like Word documents, CSVs, or images (via OCR for text extraction).
+- **File Listing UI**: Add a sidebar that lists all uploaded files and allows users to manage (delete/view) them.
 
----
+### Advanced Tracing and Analytics
 
-### 2. **File Management**
+- **Usage Analytics**: Track the number of queries, response times, and user feedback on responses.
+- **Error Logging**: Store errors in a centralized log to troubleshoot issues more effectively.
 
-#### **Multiple File Formats**
+### API Integration
 
-- **Description**: Support additional file types like Word documents, CSVs, or images (via OCR for text extraction).
-- **Implementation**: Use libraries such as `python-docx` (for Word), `pandas` (for CSV), and `pytesseract` (for OCR).
+- **REST API**: Expose core functionalities via a REST API using FastAPI for external integrations.
 
-#### **File Listing UI**
+### Security Enhancements
 
-- **Description**: Add a sidebar in the UI to list all uploaded files and allow users to delete or view them.
-- **Implementation**: Extend the Streamlit UI to include file management options.
+- **Access Control**: Implement user authentication and role-based access to features using Auth0.
+- **Data Encryption**: Encrypt uploaded files and query results to enhance data privacy with PyCryptodome.
 
----
+### Enhanced Retrieval
 
-### 3. **Advanced Tracing and Analytics**
+- **Hybrid Scoring System**: Improve the hybrid BM25 + FAISS system by adding Dense Passage Retrieval (DPR).
+- **Semantic Clustering**: Use HDBSCAN for clustering similar documents for better retrieval.
 
-#### **Usage Analytics**
+### Performance Optimization
 
-- **Description**: Track the number of queries, response times, and user feedback.
-- **Implementation**: Integrate with LangSmith or set up a custom analytics service using `Flask` and `SQLite`.
+- **Parallel Processing**: Use Ray for multi-threading to process large files faster.
+- **Caching System**: Implement Redis for caching embeddings or document chunks.
 
-#### **Error Logging**
+### Feedback System
 
-- **Description**: Store errors in a centralized log for easier debugging.
-- **Implementation**: Use Python's `logging` library and set up a log file for errors.
+- **Feedback Loop**: Allow users to rate responses to improve system accuracy over time.
+- **Interactive Debugging**: Let users report issues or flag incorrect answers directly from the UI.
 
----
+### Testing and CI/CD
 
-### 4. **API Integration**
+- **Automated Testing**: Add unit tests using Pytest and integration tests with LangChain's test utilities.
+- **Continuous Deployment**: Use GitHub Actions for CI/CD pipelines.
 
-#### **REST API**
+### Community Engagement
 
-- **Description**: Expose core functionalities via a REST API for external app integration.
-- **Implementation**: Use the `Flask` framework to create API endpoints for document upload, retrieval, and QA.
-- **References**: [Flask Documentation](https://flask.palletsprojects.com/en/2.3.x/)
+- **Knowledge Base**: Create a knowledge base or documentation portal with MkDocs for users and developers.
+- **Community Contributions**: Open source the project and invite external contributions.
 
----
+## References
 
-### 5. **Security Enhancements**
+- [LangChain Documentation](https://langchain.com/)
+- [Ollama Documentation](https://ollama.com/docs)
+- [Streamlit Documentation](https://docs.streamlit.io/)
+- [LangSmith](https://docs.langchain.com/docs/).
 
-#### **Access Control**
-
-- **Description**: Implement user authentication and role-based access to features.
-- **Implementation**: Use `Flask-JWT-Extended` or similar libraries for secure authentication.
-
-#### **Data Encryption**
-
-- **Description**: Encrypt uploaded files and query results to enhance privacy.
-- **Implementation**: Leverage Python's `cryptography` library.
-
----
-
-### 6. **Enhanced Retrieval**
-
-#### **Hybrid Scoring System**
-
-- **Description**: Improve the retrieval system by adding Dense Passage Retrieval (DPR).
-- **Implementation**: Use Hugging Face's `sentence-transformers` to generate embeddings.
-- **References**: [DPR Documentation](https://github.com/facebookresearch/DPR)
-
-#### **Semantic Clustering**
-
-- **Description**: Implement clustering algorithms to group similar documents for better retrieval.
-- **Implementation**: Use `scikit-learn`'s clustering algorithms (e.g., KMeans).
-
----
-
-### 7. **Performance Optimization**
-
-#### **Parallel Processing**
-
-- **Description**: Use multi-threading or multiprocessing for faster file processing.
-- **Implementation**: Use Python's `concurrent.futures` or `multiprocessing`.
-
-#### **Caching System**
-
-- **Description**: Cache embeddings or document chunks for frequently queried files.
-- **Implementation**: Use `redis` or `diskcache`.
-
----
-
-### 8. **Feedback System**
-
-#### **Feedback Loop**
-
-- **Description**: Allow users to rate responses to improve system accuracy over time.
-- **Implementation**: Add a rating system in the UI and store feedback in a database.
-
-#### **Interactive Debugging**
-
-- **Description**: Enable users to flag incorrect answers directly from the UI.
-- **Implementation**: Add a "Report Issue" button to log flagged responses.
-
----
-
-### 9. **Testing and CI/CD**
-
-#### **Automated Testing**
-
-- **Description**: Add unit tests and integration tests to ensure robustness.
-- **Implementation**: Use `pytest` for testing.
-
-#### **Continuous Deployment**
-
-- **Description**: Set up CI/CD pipelines for seamless updates.
-- **Implementation**: Use GitHub Actions or similar services.
-
----
-
-### 10. **Community Engagement**
-
-#### **Knowledge Base**
-
-- **Description**: Create a knowledge base or documentation portal for users and developers.
-- **Implementation**: Use platforms like GitBook or ReadTheDocs.
-
-#### **Community Contributions**
-
-- **Description**: Open source the project and invite external contributions.
-- **Implementation**: Add a `CONTRIBUTING.md` file and set up GitHub issues for community collaboration.
-
----
+Feel free to contribute to this project and suggest new features! If you encounter any issues, please open an issue in the GitHub repository.
