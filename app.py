@@ -1,11 +1,15 @@
 import streamlit as st
-from retriever import load_and_process_pdf, get_hybrid_retriever  # Correct import
+from retriever import load_and_process_pdf, get_hybrid_retriever
 from model import get_qa_chain
 from utils import save_uploaded_file
-from langchain.embeddings import HuggingFaceEmbeddings
 
-st.set_page_config(page_title="Hybrid RAG System", layout="wide")
-st.title("🚀 Hybrid RAG with BM25 & FAISS")
+# Function to clean invalid characters
+def clean_text(text):
+    """Removes or replaces invalid characters from a string."""
+    return text.encode("utf-8", "ignore").decode("utf-8")
+
+st.set_page_config(page_title="Hybrid RAG System with Memory", layout="wide")
+st.title("🚀 Hybrid RAG with BM25 & FAISS + Memory")
 
 uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
 
@@ -17,9 +21,9 @@ if uploaded_file:
     documents = load_and_process_pdf(save_path)
 
     # **Call the function** to get the retriever instance
-    retriever = get_hybrid_retriever(documents)  # Correctly calling the function to get retriever instance
+    retriever = get_hybrid_retriever(documents)
 
-    # Initialize the QA chain
+    # Initialize the QA chain with memory
     qa_chain = get_qa_chain(retriever)
 
     # User input
@@ -27,21 +31,27 @@ if uploaded_file:
 
     if user_input:
         with st.spinner("Processing..."):
-            # Retrieve relevant documents using the retriever's _get_relevant_documents method
-            context_data = retriever._get_relevant_documents(user_input)  # Retrieve relevant docs using the correct method
+            # Retrieve relevant documents using the retriever's method
+            context_data = retriever._get_relevant_documents(user_input)
+
+            # Clean retrieved context and user input
+            cleaned_context = "\n".join([clean_text(doc.page_content) for doc in context_data])
+            cleaned_user_input = clean_text(user_input)
 
             # Prepare the correct dictionary for input variables
             input_data = {
-                "context": context_data,  # Add the context from retriever
-                "query": user_input       # Change 'question' to 'query' as per LangChain's expectations
+                "query": cleaned_user_input,  # Use cleaned user query
+                "context": cleaned_context   # Use cleaned context
             }
 
-            # Use invoke() to handle multiple output keys
-            response = qa_chain.invoke(input_data)  # Changed run() to invoke()
+            # Use the `__call__` method of the chain to process inputs
+            response = qa_chain(input_data)
 
             # Extract and display the result and source documents
             result = response.get("result", "No result found.")
             source_documents = response.get("source_documents", [])
 
             st.write("Response:", result)
-            st.write("Source Documents:", source_documents)
+            st.write("Source Documents:")
+            for doc in source_documents:
+                st.write(doc.page_content)
