@@ -1,12 +1,14 @@
+# app/model.py
+
 from langchain.llms import Ollama
 from langchain.prompts import PromptTemplate
 from langchain.chains.llm import LLMChain
 from langchain.chains.combine_documents.stuff import StuffDocumentsChain
 from langchain.chains import RetrievalQA
-from callback_handler import StreamlitCallbackHandler  # Import the callback handler
+from app.config import LLM_MODEL  # Import model configuration
 
-# Initialize Ollama with the DeepSeek R1 model
-llm = Ollama(model="deepseek-r1:1.5b")
+# Initialize Ollama with the DeepSeek model from config
+llm = Ollama(model=LLM_MODEL)
 
 # Define the QA prompt
 QA_PROMPT = PromptTemplate.from_template("""
@@ -20,9 +22,18 @@ Helpful Answer:
 """)
 
 def get_qa_chain(retriever):
-    """Returns a conversational QA chain."""
-    llm_chain = LLMChain(llm=llm, prompt=QA_PROMPT)
+    """
+    Creates and returns a RetrievalQA chain that processes queries 
+    using the DeepSeek model and a retriever.
     
+    Args:
+        retriever: A document retriever to fetch relevant context.
+
+    Returns:
+        RetrievalQA chain instance.
+    """
+    llm_chain = LLMChain(llm=llm, prompt=QA_PROMPT)
+
     document_prompt = PromptTemplate(
         input_variables=["page_content", "source"],
         template="Context:\ncontent:{page_content}\nsource:{source}",

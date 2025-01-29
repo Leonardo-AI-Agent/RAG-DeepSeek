@@ -7,3 +7,7 @@ huggingface_hub>=0.15.1
 numpy>=1.24.3
 langchain_community
 sentence_transformers
+fastapi
+uvicorn
+loguru
+python-multipart

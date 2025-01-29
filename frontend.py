@@ -1,7 +1,8 @@
 import os
+from callback_handler import StreamlitCallbackHandler
 import streamlit as st
 from retriever import load_and_process_pdf, get_hybrid_retriever
-from model import get_qa_chain
+from app.model import get_qa_chain
 from utils import save_uploaded_file
 
 # Ensure the 'data' directory exists
@@ -9,6 +10,8 @@ os.makedirs("data", exist_ok=True)
 
 st.set_page_config(page_title="Hybrid RAG System", layout="wide")
 st.title("🚀 Hybrid RAG with BM25 & FAISS")
+
+callback = StreamlitCallbackHandler()  # Initialize callback for token streaming
 
 uploaded_files = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
 
@@ -51,7 +54,11 @@ if uploaded_files:
             result = response.get("result", "No result found.")
             source_documents = response.get("source_documents", [])
 
-            st.write("Response:", result)
-            st.write("Source Documents:")
+            st.write("### Response:")
+            # Token-by-token streaming with the callback
+            for token in result:
+                callback.on_llm_new_token(token)
+
+            st.write("\n### Source Documents:")
             for doc in source_documents:
                 st.write(doc.page_content)
