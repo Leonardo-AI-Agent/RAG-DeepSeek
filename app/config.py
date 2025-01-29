@@ -2,6 +2,7 @@
 
 import os
 from dotenv import load_dotenv
+from loguru import logger 
 
 # Load environment variables from .env file
 load_dotenv()
@@ -43,6 +44,30 @@ CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", 150))  # Overlap to improve retri
 # -------------------------------
 
 STREAMING_DELAY = float(os.getenv("STREAMING_DELAY", 0.02))  # Delay between streamed tokens
+
+# -------------------------------
+# 📝 Logging Configuration (NEW)
+# -------------------------------
+
+LOG_FILE_PATH = os.getenv("LOG_FILE_PATH", "logs/performance.log")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+LOG_ROTATION = os.getenv("LOG_ROTATION", "10MB")  # Rotate logs at 10MB
+LOG_RETENTION = os.getenv("LOG_RETENTION", "7")  # Keep logs for 7 days
+LOG_FORMAT = os.getenv("LOG_FORMAT", "{time} | {level} | {message}")
+
+# Ensure logs directory exists
+os.makedirs(os.path.dirname(LOG_FILE_PATH), exist_ok=True)
+
+# Configure Loguru logger
+logger.add(
+    LOG_FILE_PATH,
+    rotation=LOG_ROTATION,
+    retention=f"{LOG_RETENTION} days",
+    level=LOG_LEVEL,
+    format=LOG_FORMAT
+)
+
+logger.info(f"Logging initialized: Writing logs to {LOG_FILE_PATH}")
 
 # -------------------------------
 # 🔐 Security (Optional)
