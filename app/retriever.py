@@ -1,18 +1,20 @@
 import numpy as np
 from rank_bm25 import BM25Okapi
-from langchain.vectorstores import FAISS
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS 
+from langchain_community.embeddings import HuggingFaceEmbeddings 
+from langchain_community.document_loaders import PyPDFLoader 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
-from langchain_core.retrievers import BaseRetriever
+from langchain_core.retrievers import BaseRetriever 
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from app.config import EMBEDDING_MODEL, CHUNK_SIZE, CHUNK_OVERLAP, TOP_K_RESULTS  # Import config variables
+from app.config import EMBEDDING_MODEL, CHUNK_SIZE, CHUNK_OVERLAP, TOP_K_RESULTS
+from app.logger_utils import log_performance 
 
 # Initialize the embedding model from config
 embedder = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
 
+@log_performance
 def load_and_process_pdf(pdf_path: str) -> List[Document]:
     """
     Loads a PDF file, splits it into chunks, and returns processed documents.
@@ -34,6 +36,7 @@ def cosine_similarity(vec1, vec2) -> float:
     """Computes cosine similarity between two vectors."""
     return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
 
+@log_performance
 def rerank_results(query: str, results: List[Document], embedder: HuggingFaceEmbeddings) -> List[Document]:
     """
     Reranks retrieval results based on similarity to the query.
@@ -58,6 +61,7 @@ def rerank_results(query: str, results: List[Document], embedder: HuggingFaceEmb
     )
     return reranked_results
 
+@log_performance
 def hybrid_with_reranking(
     query: str, 
     bm25: BM25Okapi, 
@@ -130,6 +134,7 @@ class HybridRetriever(BaseRetriever, BaseModel):
         # Initialize FAISS
         self.faiss_retriever = FAISS.from_documents(self.documents, self.embedder)
 
+    @log_performance
     def _get_relevant_documents(self, query: str, top_k: int = TOP_K_RESULTS) -> List[Document]:
         """
         Retrieves relevant documents using hybrid search.
@@ -143,6 +148,7 @@ class HybridRetriever(BaseRetriever, BaseModel):
         """
         return hybrid_with_reranking(query, self.bm25, self.faiss_retriever, self.embedder, self.documents, top_k)
 
+@log_performance
 def get_hybrid_retriever(documents: List[Document]) -> HybridRetriever:
     """
     Creates an instance of HybridRetriever.
