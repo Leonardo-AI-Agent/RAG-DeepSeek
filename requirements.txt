@@ -5,3 +5,10 @@ rank_bm25>=0.2.1
 llama-index>=0.6.6
 huggingface_hub>=0.15.1
 numpy>=1.24.3
+langchain
+langchain_openai
+langgraph
+arxiv
+duckduckgo-search
+faiss-cpu
+pymupdf

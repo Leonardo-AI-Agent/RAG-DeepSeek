@@ -1,15 +1,54 @@
 import streamlit as st
-from retriever import load_and_process_pdf, get_hybrid_retriever
-from model import get_qa_chain
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 from utils import save_uploaded_file
+from retriever import get_hybrid_retriever, load_and_process_pdf
+from langchain.llms import Ollama
+from langchain_core.runnables import RunnablePassthrough
+
+load_dotenv()
+
+def format_docs(docs):
+    return "\n\n".join([d.page_content for d in docs])
+
+def get_response(retriever, user_query, chat_history):
+
+    template = """
+    You are a LeonardoAI. A tokenized AI Agent that can generate human-like responses.
+
+    Give short responses to the user's questions based on the context and chat history.
+
+    Context: {context}
+
+    Chat history: {chat_history}
+
+    User question: {user_question}
+    """
+
+    prompt = ChatPromptTemplate.from_template(template)
+
+    # Initialize Ollama with the DeepSeek R1 model
+    llm = Ollama(model="deepseek-r1:1.5b")
+        
+    chain = prompt | llm | StrOutputParser()
+    
+    return chain.stream({
+        "context": retriever | format_docs,
+        "chat_history": chat_history,
+        "user_question": user_query,
+    })
 
 # Function to clean invalid characters
 def clean_text(text):
     """Removes or replaces invalid characters from a string."""
     return text.encode("utf-8", "ignore").decode("utf-8")
 
-st.set_page_config(page_title="Hybrid RAG System with Memory", layout="wide")
-st.title("🚀 Hybrid RAG with BM25 & FAISS + Memory")
+# app config
+st.set_page_config(page_title="Streamlit Chatbot", page_icon="🤖")
+st.title("Chatbot")
 
 uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
 
@@ -23,35 +62,31 @@ if uploaded_file:
     # **Call the function** to get the retriever instance
     retriever = get_hybrid_retriever(documents)
 
-    # Initialize the QA chain with memory
-    qa_chain = get_qa_chain(retriever)
+    # session state
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = [
+            AIMessage(content="Hello, I'm LeonardoAI. How can I help you today?")
+        ]
 
-    # User input
-    user_input = st.text_input("Ask a question:")
+    # conversation
+    for message in st.session_state.chat_history:
+        if isinstance(message, AIMessage):
+            with st.chat_message("AI"):
+                st.write(message.content)
+        elif isinstance(message, HumanMessage):
+            with st.chat_message("Human"):
+                st.write(message.content)
 
-    if user_input:
-        with st.spinner("Processing..."):
-            # Retrieve relevant documents using the retriever's method
-            context_data = retriever._get_relevant_documents(user_input)
+    # user input
+    user_query = st.chat_input("Type your message here...")
+    if user_query is not None and user_query != "":
+        st.session_state.chat_history.append(HumanMessage(content=user_query))
 
-            # Clean retrieved context and user input
-            cleaned_context = "\n".join([clean_text(doc.page_content) for doc in context_data])
-            cleaned_user_input = clean_text(user_input)
+        with st.chat_message("Human"):
+            st.markdown(user_query)
 
-            # Prepare the correct dictionary for input variables
-            input_data = {
-                "query": cleaned_user_input,  # Use cleaned user query
-                "context": cleaned_context   # Use cleaned context
-            }
+        with st.chat_message("AI"):
+            response = st.write_stream(get_response(retriever, user_query, st.session_state.chat_history))
+            print(response)
 
-            # Use the `__call__` method of the chain to process inputs
-            response = qa_chain(input_data)
-
-            # Extract and display the result and source documents
-            result = response.get("result", "No result found.")
-            source_documents = response.get("source_documents", [])
-
-            st.write("Response:", result)
-            st.write("Source Documents:")
-            for doc in source_documents:
-                st.write(doc.page_content)
+        st.session_state.chat_history.append(AIMessage(content=response))
