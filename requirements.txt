@@ -11,3 +11,7 @@ fastapi
 uvicorn
 loguru
 python-multipart
+langgraph
+langgraph-checkpoint-mongodb
+pymongo
+langchain-mongodb
