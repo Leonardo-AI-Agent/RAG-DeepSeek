@@ -335,6 +335,8 @@ class Agent:
 
         # Generate 3D image prompt
         llm = ChatOpenAI(model="gpt-4o")
+
+        # TODO: modify the prompt as needed
         system_message = generate_3d_image_prompt_instructions.format(messages=state["messages"])
         response = llm.invoke([SystemMessage(content=system_message)] + [HumanMessage(content="Generate a 3D image prompt")])
 
@@ -348,6 +350,8 @@ class Agent:
 
         # Generate 3D object prompt
         llm = ChatOpenAI(model="gpt-4o")
+
+        # TODO: modify the prompt as needed
         system_message = generate_3d_object_prompt_instructions.format(messages=state["messages"], image_prompt=state["image_prompt"])
         response = llm.invoke([SystemMessage(content=system_message)] + [HumanMessage(content="Generate a 3D object prompt")])
 
