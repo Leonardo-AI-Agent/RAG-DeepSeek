@@ -2,7 +2,6 @@
 
 import os
 from dotenv import load_dotenv
-from loguru import logger 
 
 # Load environment variables from .env file
 load_dotenv()
@@ -15,6 +14,9 @@ load_dotenv()
 APP_NAME = "Hybrid RAG API"
 APP_VERSION = "1.0.0"
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
+BASE_URL = os.getenv("BASE_URL", "https://api.cdp.coinbase.com")
+API_KEY_NAME = os.getenv("API_KEY_NAME", "x-api-key")
+API_KEY_PRIVATE = os.getenv("API_KEY_PRIVATE", "x-api-key-private")
 
 # Storage Paths
 DATA_DIR = os.getenv("DATA_DIR", "data")  # Default folder for storing PDFs
@@ -57,17 +59,6 @@ LOG_FORMAT = os.getenv("LOG_FORMAT", "{time} | {level} | {message}")
 
 # Ensure logs directory exists
 os.makedirs(os.path.dirname(LOG_FILE_PATH), exist_ok=True)
-
-# Configure Loguru logger
-logger.add(
-    LOG_FILE_PATH,
-    rotation=LOG_ROTATION,
-    retention=f"{LOG_RETENTION} days",
-    level=LOG_LEVEL,
-    format=LOG_FORMAT
-)
-
-logger.info(f"Logging initialized: Writing logs to {LOG_FILE_PATH}")
 
 # -------------------------------
 # 🔐 Security (Optional)

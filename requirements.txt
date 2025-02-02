@@ -15,3 +15,5 @@ langgraph
 langgraph-checkpoint-mongodb
 pymongo
 langchain-mongodb
+cdp-sdk
+python-dotenv

@@ -14,7 +14,9 @@ class ThreadedQueryRequest(BaseModel):
     question: str
     # Optional thread_id to specify the thread to query
     thread_id: str = None
+    user_id: str = None
 
 class ThreadedQueryResponse(BaseModel):
     answer: str
     thread_id: str
+    user_id: str

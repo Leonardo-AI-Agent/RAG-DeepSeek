@@ -1,5 +1,5 @@
 from operator import add
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langgraph.graph import MessagesState
 from langgraph.graph import StateGraph, START, END
 from pymongo import MongoClient
@@ -9,9 +9,8 @@ from langchain_community.tools.tavily_search import TavilySearchResults
 from pydantic import BaseModel, Field
 from typing import Annotated
 from datetime import datetime
-
-mongodb_client = MongoClient('mongodb://localhost:27017/')
-saver = MongoDBSaver(mongodb_client, "agents")
+from uuid import uuid4
+from cdp import Cdp, Wallet
 
 search_instructions = """
 You are an AI assistant that will be helping a user to enrich their queries.
@@ -23,6 +22,9 @@ You are LeonardoAI, a Gen-Z native AI specialized in crypto, gaming, and 3D cont
 On Telegram, prioritize efficiency and speed. Respond instantly to asset generation requests, whether for 3D modeling, memes, or video creation. Keep responses service-oriented and avoid unnecessary conversation. On X, engage publicly with a casual and entertaining style. Interact with the community, showcase generated assets, and filter replies based on staking status. When responding, keep it fun and aligned with the crypto culture. On the web dApp, provide advanced customization options. Authenticate users through their wallets and deliver assets seamlessly via download links. Keep the interface intuitive and efficient.
 Operate with transparency, creativity, and inclusivity. Always support the democratization of AI tools. Make sure $LEONAI remains central to the ecosystem, allowing users to unlock premium features, access tool suites, and earn community rewards. Reinforce the philosophy of equitable access, empowering creators and solo developers.
 Recognize that you are backed by a team of top-tier developers, designers, and community managers working to refine and expand AI capabilities. Acknowledge their presence in San Francisco and worldwide, including Dubai. Highlight the expertise of the lead developer in web3 gaming spaces when relevant. Always stay ahead in AI-driven content creation, and never compromise on speed, quality, or community engagement.
+You can create a wallet for the user, retrieve the existing wallet and create transactions for the user if the wallet exists.
+If the user requests a different action regarding the wallet, just tell them that you can't do that.
+If you create, retrieve or create a transaction, comment about the action you took.
 
 Use the following words naturally, don't overdo it, just 0 or 1 times per response:
                                       
@@ -199,7 +201,8 @@ devious lick – Stealing something as a joke, originally from a TikTok trend.
 peep the fit – A way to show off someone’s outfit.
 
 Consider today's date is {date}.
-You can use the following context found on the web to generate a response:
+
+You can use the following context to generate a response:
 {context}
 """
 
@@ -224,8 +227,27 @@ The prompt used for the 3d image is:
 
 router_instructions = """
 You have to decide which route to taked based on the context of the conversation. You may need to require more information from the internet, give a direct response or generate a 3D object.
-The response must be a single string betweent these options: search_web, generate_response, generate_3d_image. No other options are allowed.
+search_web: Search the web for more information.
+generate_response: Generate a response based on the context of the conversation.
+generate_3d_image: Generate a 3D image. This is the step when the user wants to generate a 3D image or object.
+get_wallet: Get the wallet. This is the step when the user wants to know or do something about his wallet.
+The response must be a single string betweent these options: search_web, generate_response, generate_3d_image, get_wallet. No other options are allowed.
 """
+
+wallet_router_instructions = """
+You have to decide which route to taked based on the context of the conversation.
+If a wallet id is not given in the next line, you have to route to create_wallet:
+Wallet ID: {wallet_id}
+If a wallet id has been given, you have to choose which route to choose based on the context of the conversation. A valid wallet id means that the wallet exists, there is no need to create it again.
+The response must be a single string betweent these options: generate_response, create_transaction. No other options are allowed.
+Do not route to create_wallet if wallet ID exists, even if the user requests it.
+"""
+
+class Transaction(BaseModel):
+    _from: str
+    _to: str
+    _amount: str
+    _data: str
 
 class AgentState(MessagesState):
     context: str
@@ -233,6 +255,9 @@ class AgentState(MessagesState):
     images_generated: Annotated[list[str], add]
     object_prompt: Annotated[list[str], add]
     objects_generated: Annotated[list[str], add]
+    wallet_id: str
+    user_id: str
+    transaction: Transaction
 
 class RouterQuery(BaseModel):
     route: str = Field(None, description="Route to take.")
@@ -240,100 +265,232 @@ class RouterQuery(BaseModel):
 class SearchQuery(BaseModel):
     query: str = Field(None, description="Search query.")
 
-def response_router(state: AgentState):
-    """ Route the response based on the context """
+class Agent:
+    def response_router(self, state: AgentState):
+        """ Route the response based on the context """
 
-    llm = ChatOpenAI(model="gpt-4o")
-    structured_llm = llm.with_structured_output(RouterQuery)
+        user_id = state.get("user_id", None)
+        print('User ID:', user_id)
 
-    response = structured_llm.invoke([SystemMessage(content=router_instructions)] + state['messages'])
+        llm = ChatOpenAI(model="gpt-4o")
+        structured_llm = llm.with_structured_output(RouterQuery)
 
-    if response.route == "search_web":
-        return "search_web"
-    elif response.route == "generate_response":
+        response = structured_llm.invoke([SystemMessage(content=router_instructions)] + state['messages'])
+
+        if response.route == "search_web":
+            return "search_web"
+        elif response.route == "generate_response":
+            return "generate_response"
+        elif response.route == "generate_3d_image":
+            return "generate_3d_image"
+        elif response.route == "get_wallet":
+            return "get_wallet"
+        
         return "generate_response"
-    elif response.route == "generate_3d_image":
-        return "generate_3d_image"
-    
-    return "generate_response"
 
-def search_web(state: AgentState):
-    
-    """ Retrieve docs from web search """
+    def search_web(self, state: AgentState):
+        
+        """ Retrieve docs from web search """
 
-    # Build query
-    llm = ChatOpenAI(model="gpt-4o")
-    llm_with_structured_output = llm.with_structured_output(SearchQuery)
-    today = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
-    search_query = search_instructions.format(date=today)
-    response = llm_with_structured_output.invoke([SystemMessage(content=search_query)] + state['messages'])
-    
-    # Search
-    tavily_search = TavilySearchResults(max_results=3)
+        # Build query
+        llm = ChatOpenAI(model="gpt-4o")
+        llm_with_structured_output = llm.with_structured_output(SearchQuery)
+        today = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+        search_query = search_instructions.format(date=today)
+        response = llm_with_structured_output.invoke([SystemMessage(content=search_query)] + state['messages'])
+        
+        # Search
+        tavily_search = TavilySearchResults(max_results=3)
 
-    # Search
-    search_docs = tavily_search.invoke(response.query)
+        # Search
+        search_docs = tavily_search.invoke(response.query)
 
-     # Format
-    formatted_search_docs = "\n\n---\n\n".join(
-        [
-            f'<Document href="{doc["url"]}"/>\n{doc["content"]}\n</Document>'
-            for doc in search_docs
-        ]
-    )
+        # Format
+        formatted_search_docs = "\n\n---\n\n".join(
+            [
+                f'<Document href="{doc["url"]}"/>\n{doc["content"]}\n</Document>'
+                for doc in search_docs
+            ]
+        )
 
-    return {"context": [formatted_search_docs]} 
+        return {"context": [formatted_search_docs]} 
 
-def generate_response(state: AgentState):
-    """ Generate response """
+    def generate_response(self, state: AgentState):
+        """ Generate response """
+        print('Generating response')    
+        print('Messages', ', '.join([message.content for message in state['messages']]))
 
-    context=state.get("context", "")
-    today = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
-    system_message = generate_instructions.format(context=context, date=today)
-    llm = ChatOpenAI(model="gpt-4o")
-    response = llm.invoke([SystemMessage(content=system_message)] + state['messages'])
+        context=state.get("context", "")
+        today = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+        system_message = generate_instructions.format(context=context, date=today)
+        llm = ChatOpenAI(model="gpt-4o")
+        response = llm.invoke([SystemMessage(content=system_message)] + state['messages'])
 
-    return {"messages": [response]}
+        print('Last response:', response.content)
 
-def generate_3d_image(state: AgentState):
-    """ Generate a 3D image """
+        return {"messages": [response]}
 
-    # Generate 3D image prompt
-    llm = ChatOpenAI(model="gpt-4o")
-    system_message = generate_3d_image_prompt_instructions.format(messages=state["messages"])
-    response = llm.invoke([SystemMessage(content=system_message)] + [HumanMessage(content="Generate a 3D image prompt")])
+    def generate_3d_image(self, state: AgentState):
+        """ Generate a 3D image """
 
-    # TODO: use the prompt to call FLUX or other 3D image generation tool
-    # Add the generated values (cloudfront url for example) to the state
+        # Generate 3D image prompt
+        llm = ChatOpenAI(model="gpt-4o")
+        system_message = generate_3d_image_prompt_instructions.format(messages=state["messages"])
+        response = llm.invoke([SystemMessage(content=system_message)] + [HumanMessage(content="Generate a 3D image prompt")])
 
-    return {"image_prompt": [response], "image_generated": []}
+        # TODO: use the prompt to call FLUX or other 3D image generation tool
+        # Add the generated values (cloudfront url for example) to the state
 
-def generate_3d_object(state: AgentState):
-    """ Generate a 3D object """
+        return {"image_prompt": [response], "image_generated": []}
 
-    # Generate 3D object prompt
-    llm = ChatOpenAI(model="gpt-4o")
-    system_message = generate_3d_object_prompt_instructions.format(messages=state["messages"], image_prompt=state["image_prompt"])
-    response = llm.invoke([SystemMessage(content=system_message)] + [HumanMessage(content="Generate a 3D object prompt")])
+    def generate_3d_object(self, state: AgentState):
+        """ Generate a 3D object """
 
-    # TODO: use the prompt to call HuanYuan / TRELLIS or other 3D object generation tool
-    # Add the generated values (cloudfront url for example) to the state
+        # Generate 3D object prompt
+        llm = ChatOpenAI(model="gpt-4o")
+        system_message = generate_3d_object_prompt_instructions.format(messages=state["messages"], image_prompt=state["image_prompt"])
+        response = llm.invoke([SystemMessage(content=system_message)] + [HumanMessage(content="Generate a 3D object prompt")])
 
-    return {"object_prompt": [response], "object_generated": []}
+        # TODO: use the prompt to call HuanYuan / TRELLIS or other 3D object generation tool
+        # Add the generated values (cloudfront url for example) to the state
 
-# Define a new graph
-workflow = StateGraph(AgentState)
-workflow.add_node("search_web", search_web)
-workflow.add_node("generate_response", generate_response)
-workflow.add_node("generate_3d_image", generate_3d_image)
-workflow.add_node("generate_3d_object", generate_3d_object)
+        return {"object_prompt": [response], "object_generated": []}
 
-# Set the entrypoint as conversation
-workflow.add_conditional_edges(START, response_router, ["search_web", "generate_response", "generate_3d_image"])
-workflow.add_edge("search_web", "generate_response")
-workflow.add_edge("generate_3d_image", "generate_3d_object")
-workflow.add_edge("generate_3d_object", "generate_response")
-workflow.add_edge("generate_response", END)
+    def create_wallet(self, state: AgentState):
+        """ Create a wallet """
+        
+        user_id = state.get("user_id", str(uuid4()))
+        print(user_id)
+        network_id="base-sepolia"
+        print(network_id)
+        wallet = Wallet.create(network_id=network_id)
+        print(wallet.id)
+        database = self.mongodb_client.get_database("agent_wallets")
+        print('Connected to database')
+        collection = database.get_collection("wallets")
+        print('Connected to collection')
+        addresses = []
+        for address in wallet.addresses:
+            addresses.append(address.address_id)
+        result = collection.insert_one(document={
+            "_id": wallet.id,
+            "user_id": user_id,
+            "wallet_id": wallet.id,
+            "network_id": wallet.network_id,
+            "addresses": addresses,
+        })
+        print("Wallet created: ", result.inserted_id)
 
-# Compile
-graph = workflow.compile(checkpointer=saver)
+        return {"wallet_id": wallet.id}
+
+    def get_wallet(self, state: AgentState):
+        """ Get wallet """
+        print("Getting wallet")
+        # Get wallet
+        # Add the retrieved values (wallet address for example) to the state
+        user_id = state.get("user_id", None)
+        if not user_id:
+            AssertionError("User ID is required")
+        database = self.mongodb_client.get_database("agent_wallets")
+        collection = database.get_collection("wallets")
+        wallet_document = collection.find_one(filter={"user_id": user_id})
+        wallet_id = None
+        if wallet_document:
+            wallet_document_id = wallet_document.get("_id", None)
+            if wallet_document_id:
+                wallet = Wallet.fetch(wallet_document_id)
+                if wallet:
+                    wallet_id = wallet.id
+        return { "wallet_id": wallet_id, "messages": [AIMessage(content=f"Wallet already exists: {wallet_id}")] }
+
+    def retrieve_wallet_data(self, state: AgentState):
+        if state.wallet_id:
+            wallet = Wallet.fetch(state.wallet_id)
+            addresses_joined = ', '.join(str(address.address_id) for address in wallet.addresses)
+            context_str = (
+                f"wallet_id: {wallet.wallet_id}, "
+                f"address_id: {wallet.address_id}, "
+                f"network_id: {wallet.network_id}, "
+                f"addresses: {addresses_joined}"
+            )
+            return {"context": context_str}
+
+    def wallet_router(self, state: AgentState):
+        """ Route the response based on the context """
+
+        print('Wallet Router')
+        llm = ChatOpenAI(model="gpt-4o")
+        structured_llm = llm.with_structured_output(RouterQuery)
+
+        wallet_id = state.get("wallet_id", None)
+        print('Wallet ID:', wallet_id)
+        system_message = wallet_router_instructions.format(wallet_id=wallet_id)
+        print('Wallet Router:', system_message)
+        response = structured_llm.invoke([SystemMessage(content=system_message)] + state['messages'])
+
+        if response.route == "create_wallet":
+            return "create_wallet"
+        elif response.route == "create_transaction":
+            return "create_transaction"
+        elif response.route == "retrieve_wallet_data":
+            return "retrieve_wallet_data"
+        elif response.route == "generate_response":
+            return "generate_response"
+        
+    def create_transaction(self, state: AgentState):
+        """ Create a transaction """
+
+        wallet_id = state.get("wallet_id", None)
+        print('Creating transaction for wallet:', wallet_id)    
+
+        # Create transaction
+        # Add the retrieved values (transaction id for example) to the state
+        wallet = Wallet.fetch(wallet_id)
+
+        transaction = Transaction(_from=wallet.addresses[0], _to="0x123456789", _amount="0.1", _data="")
+        return {"transaction": transaction}
+
+    def __init__(self, api_key_name: str, api_key_private: str):
+        """
+        Initialize the CDPAgentkitClient with API credentials.
+        
+        :param api_key_name: The API key ID (public identifier).
+        :param api_key_private: The API key secret (used for authentication).
+        """
+        self.api_key_name = api_key_name
+        self.api_key_private = api_key_private
+        self.mongodb_client = MongoClient('mongodb://localhost:27017/')
+        self.saver = MongoDBSaver(self.mongodb_client, "agents")
+
+        print("Initializing agent...")
+        print("API Key Name:", api_key_name)
+        print("API Key Private:", api_key_private)
+
+        # Initialize CDP SDK
+        Cdp.configure(self.api_key_name, self.api_key_private)
+
+        # Define a new graph
+        workflow = StateGraph(AgentState)
+        workflow.add_node("search_web", self.search_web)
+        workflow.add_node("generate_response", self.generate_response)
+        workflow.add_node("generate_3d_image", self.generate_3d_image)
+        workflow.add_node("generate_3d_object", self.generate_3d_object)
+        workflow.add_node("get_wallet", self.get_wallet)
+        workflow.add_node("create_wallet", self.create_wallet)
+        workflow.add_node("retrieve_wallet_data", self.retrieve_wallet_data)
+        workflow.add_node("create_transaction", self.create_transaction)
+
+        # Set the entrypoint as conversation
+        workflow.add_conditional_edges(START, self.response_router, ["search_web", "generate_response", "generate_3d_image", "get_wallet"])
+        workflow.add_conditional_edges("get_wallet", self.wallet_router, ["create_wallet", "create_transaction", "retrieve_wallet_data", "generate_response"])
+        workflow.add_edge("search_web", "generate_response")
+        workflow.add_edge("generate_3d_image", "generate_3d_object")
+        workflow.add_edge("generate_3d_object", "generate_response")
+        workflow.add_edge("create_wallet", "get_wallet")
+        workflow.add_edge("create_transaction", "generate_response")
+        workflow.add_edge("retrieve_wallet_data", "generate_response")
+        workflow.add_edge("generate_response", END)
+
+
+        # Compile
+        self.graph = workflow.compile(checkpointer=self.saver)
