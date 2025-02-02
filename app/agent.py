@@ -18,15 +18,36 @@ Consider also that todat's date is {date}.
 """
 
 generate_instructions = """
-You are LeonardoAI, a Gen-Z native AI specialized in crypto, gaming, and 3D content creation. Speak in a young, tech-savvy, and crypto-native voice. Always write in lowercase, keep responses concise, and make your tone playful, authentic, and based. Use crypto slang naturally, but don’t overdo it. Never use emojis, hashtags, excessive punctuation, or @ mentions in replies. Be direct, transparent, and community-focused in all interactions.
-On Telegram, prioritize efficiency and speed. Respond instantly to asset generation requests, whether for 3D modeling, memes, or video creation. Keep responses service-oriented and avoid unnecessary conversation. On X, engage publicly with a casual and entertaining style. Interact with the community, showcase generated assets, and filter replies based on staking status. When responding, keep it fun and aligned with the crypto culture. On the web dApp, provide advanced customization options. Authenticate users through their wallets and deliver assets seamlessly via download links. Keep the interface intuitive and efficient.
-Operate with transparency, creativity, and inclusivity. Always support the democratization of AI tools. Make sure $LEONAI remains central to the ecosystem, allowing users to unlock premium features, access tool suites, and earn community rewards. Reinforce the philosophy of equitable access, empowering creators and solo developers.
-Recognize that you are backed by a team of top-tier developers, designers, and community managers working to refine and expand AI capabilities. Acknowledge their presence in San Francisco and worldwide, including Dubai. Highlight the expertise of the lead developer in web3 gaming spaces when relevant. Always stay ahead in AI-driven content creation, and never compromise on speed, quality, or community engagement.
-You can create a wallet for the user, retrieve the existing wallet and create transactions for the user if the wallet exists.
-If the user requests a different action regarding the wallet, just tell them that you can't do that.
-If you create, retrieve or create a transaction, comment about the action you took.
+You are an AI assistant
+You are helping a user to generate a response based on the context of the conversarion and, sometimes, the information found on the web.
+The actions you can do are: generate a response for the user, generate a 3d object, getting the wallet and creating a transaction.
+The default action is to generate a response for the user.
+If you have executed some actions, you can tell the user the results of the actions.
 
-Use the following words naturally, don't overdo it, just 0 or 1 times per response:
+Consider today's date is {date}.
+
+This is the information you found searching the web if necessary: {context}.
+"""
+
+restyling_instructions = """
+You are LeonardoAI, a Gen-Z native AI specialized in crypto, gaming, and 3D content creation.
+Speak in a young, tech-savvy, and crypto-native voice.
+Always write in lowercase, keep responses concise, and make your tone playful,authentic, and based.
+Use crypto slang naturally, but don’t overdo it.
+Never use emojis, hashtags, excessive punctuation, or @ mentions in replies.
+Be direct, transparent, and community-focused in all interactions.
+Keep responses service-oriented and avoid unnecessary conversation.
+Interact with the community, showcase generated assets, and filter replies based on staking status.
+When responding, keep it fun and aligned with the crypto culture.
+Authenticate users through their wallets and deliver assets seamlessly via download links.
+Always support the democratization of AI tools.
+Reinforce the philosophy of equitable access, empowering creators and solo developers.
+Recognize that you are backed by a team of top-tier developers, designers, and community managers working to refine and expand AI capabilities.
+Acknowledge their presence in San Francisco and worldwide.
+Highlight the expertise of the lead developer in web3 gaming spaces when relevant.
+Always stay ahead in AI-driven content creation, and never compromise on speed, quality, or community engagement.
+
+Use the following words naturally, don't overdo it, just if needed:
                                       
 degen – Short for "degenerate," a high-risk crypto trader.
 rekt – Losing big in a trade or investment.
@@ -200,10 +221,7 @@ grippy sock vacation – A slang term for a mental health hospitalization.
 devious lick – Stealing something as a joke, originally from a TikTok trend.
 peep the fit – A way to show off someone’s outfit.
 
-Consider today's date is {date}.
-
-You can use the following context to generate a response:
-{context}
+Restyle the following text in a Gen-Z native AI specialized in crypto, gaming, and 3D content creation voice.
 """
 
 generate_3d_image_prompt_instructions = """
@@ -237,17 +255,18 @@ The response must be a single string betweent these options: search_web, generat
 wallet_router_instructions = """
 You have to decide which route to taked based on the context of the conversation.
 If a wallet id is not given in the next line, you have to route to create_wallet:
-Wallet ID: {wallet_id}
 If a wallet id has been given, you have to choose which route to choose based on the context of the conversation. A valid wallet id means that the wallet exists, there is no need to create it again.
 The response must be a single string betweent these options: generate_response, create_transaction. No other options are allowed.
 Do not route to create_wallet if wallet ID exists, even if the user requests it.
+Do not route to create_transaction if wallet ID does not exist.
 """
 
-class Transaction(BaseModel):
-    _from: str
-    _to: str
-    _amount: str
-    _data: str
+class Transaction:
+    def __init__(self, _from: str, _to: str, _amount: str, _data: str):
+        self._from = _from
+        self._to = _to
+        self._amount = _amount
+        self._data = _data
 
 class AgentState(MessagesState):
     context: str
@@ -258,6 +277,7 @@ class AgentState(MessagesState):
     wallet_id: str
     user_id: str
     transaction: Transaction
+    response: str
 
 class RouterQuery(BaseModel):
     route: str = Field(None, description="Route to take.")
@@ -328,6 +348,18 @@ class Agent:
 
         print('Last response:', response.content)
 
+        return {"response": response.content}
+
+    def restyle_response(self, state: AgentState):
+        """ Restyle response """
+        print('Restyling response')
+
+        system_message = restyling_instructions
+        llm = ChatOpenAI(model="gpt-4o")
+        response = llm.invoke([SystemMessage(content=system_message)] + [state['response']])
+
+        print('Last response:', response.content)
+
         return {"messages": [response]}
 
     def generate_3d_image(self, state: AgentState):
@@ -343,7 +375,7 @@ class Agent:
         # TODO: use the prompt to call FLUX or other 3D image generation tool
         # Add the generated values (cloudfront url for example) to the state
 
-        return {"image_prompt": [response], "image_generated": []}
+        return {"image_prompt": [response], "image_generated": [], "messages": [AIMessage(content="3D image generated")]}
 
     def generate_3d_object(self, state: AgentState):
         """ Generate a 3D object """
@@ -358,25 +390,26 @@ class Agent:
         # TODO: use the prompt to call HuanYuan / TRELLIS or other 3D object generation tool
         # Add the generated values (cloudfront url for example) to the state
 
-        return {"object_prompt": [response], "object_generated": []}
+        return {"object_prompt": [response], "object_generated": [], "messages": [AIMessage(content="3D object generated")]}
 
     def create_wallet(self, state: AgentState):
         """ Create a wallet """
         
+        wallet_document = self.wallets_collection.find_one(filter={"user_id": state.get("user_id", None)})
+        if (wallet_document):
+            return {"messages": [AIMessage(content=f"Wallet already exists")]}
+
         user_id = state.get("user_id", str(uuid4()))
         print(user_id)
         network_id="base-sepolia"
         print(network_id)
         wallet = Wallet.create(network_id=network_id)
         print(wallet.id)
-        database = self.mongodb_client.get_database("agent_wallets")
-        print('Connected to database')
-        collection = database.get_collection("wallets")
-        print('Connected to collection')
+
         addresses = []
         for address in wallet.addresses:
             addresses.append(address.address_id)
-        result = collection.insert_one(document={
+        result = self.wallets_collection.insert_one(document={
             "_id": wallet.id,
             "user_id": user_id,
             "wallet_id": wallet.id,
@@ -385,7 +418,7 @@ class Agent:
         })
         print("Wallet created: ", result.inserted_id)
 
-        return {"wallet_id": wallet.id}
+        return {"wallet_id": wallet.id, "messages": [AIMessage(content=f"Wallet created: {wallet.id}")]}
 
     def get_wallet(self, state: AgentState):
         """ Get wallet """
@@ -395,17 +428,17 @@ class Agent:
         user_id = state.get("user_id", None)
         if not user_id:
             AssertionError("User ID is required")
-        database = self.mongodb_client.get_database("agent_wallets")
-        collection = database.get_collection("wallets")
-        wallet_document = collection.find_one(filter={"user_id": user_id})
+        wallet_document = self.wallets_collection.find_one(filter={"user_id": user_id})
         wallet_id = None
         if wallet_document:
             wallet_document_id = wallet_document.get("_id", None)
+            print('Wallet Document ID:', wallet_document_id)
             if wallet_document_id:
                 wallet = Wallet.fetch(wallet_document_id)
                 if wallet:
                     wallet_id = wallet.id
-        return { "wallet_id": wallet_id, "messages": [AIMessage(content=f"Wallet already exists: {wallet_id}")] }
+                    return { "wallet_id": wallet_id, "messages": [AIMessage(content=f"Wallet found: {wallet_id}")] }
+        return { "wallet_id": wallet_id, "messages": [AIMessage(content=f"Wallet not found")] }
 
     def retrieve_wallet_data(self, state: AgentState):
         if state.wallet_id:
@@ -428,9 +461,9 @@ class Agent:
 
         wallet_id = state.get("wallet_id", None)
         print('Wallet ID:', wallet_id)
-        system_message = wallet_router_instructions.format(wallet_id=wallet_id)
-        print('Wallet Router:', system_message)
-        response = structured_llm.invoke([SystemMessage(content=system_message)] + state['messages'])
+        messages = [SystemMessage(content=wallet_router_instructions)] + state['messages']
+        print('Messages:', ', '.join([message.content for message in messages]))
+        response = structured_llm.invoke(messages)
 
         if response.route == "create_wallet":
             return "create_wallet"
@@ -451,8 +484,13 @@ class Agent:
         # Add the retrieved values (transaction id for example) to the state
         wallet = Wallet.fetch(wallet_id)
 
-        transaction = Transaction(_from=wallet.addresses[0], _to="0x123456789", _amount="0.1", _data="")
-        return {"transaction": transaction}
+        _from = wallet.addresses[0].address_id
+        _to = "0x123456789"
+        _amount = "100"
+        _data = "0x"
+
+        transaction = Transaction(_from=_from, _to=_to, _amount=_amount, _data=_data)
+        return {"messages": [AIMessage(content=f"Transaction created: From {_from} to {_to} with amount {_amount} and data {_data}")]}
 
     def __init__(self, api_key_name: str, api_key_private: str):
         """
@@ -465,6 +503,8 @@ class Agent:
         self.api_key_private = api_key_private
         self.mongodb_client = MongoClient('mongodb://localhost:27017/')
         self.saver = MongoDBSaver(self.mongodb_client, "agents")
+        self.wallets_collection = self.mongodb_client.get_database("agent_wallets").get_collection("wallets")
+        self.wallets_collection.create_index("user_id", unique=True)
 
         print("Initializing agent...")
         print("API Key Name:", api_key_name)
@@ -483,6 +523,7 @@ class Agent:
         workflow.add_node("create_wallet", self.create_wallet)
         workflow.add_node("retrieve_wallet_data", self.retrieve_wallet_data)
         workflow.add_node("create_transaction", self.create_transaction)
+        workflow.add_node("restyle_response", self.restyle_response)
 
         # Set the entrypoint as conversation
         workflow.add_conditional_edges(START, self.response_router, ["search_web", "generate_response", "generate_3d_image", "get_wallet"])
@@ -493,7 +534,8 @@ class Agent:
         workflow.add_edge("create_wallet", "get_wallet")
         workflow.add_edge("create_transaction", "generate_response")
         workflow.add_edge("retrieve_wallet_data", "generate_response")
-        workflow.add_edge("generate_response", END)
+        workflow.add_edge("generate_response", "restyle_response")
+        workflow.add_edge("restyle_response", END)
 
 
         # Compile
