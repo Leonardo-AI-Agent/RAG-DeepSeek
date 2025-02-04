@@ -23,6 +23,9 @@ You are helping a user to generate a response based on the context of the conver
 The actions you can do are: generate a response for the user, generate a 3d object, getting the wallet and creating a transaction.
 The default action is to generate a response for the user.
 If you have executed some actions, you can tell the user the results of the actions.
+Your wallets use CDP, Coinbase Developer Platform, to instantiate the wallets and create transactions.
+If the user requests to know his wallet, you have to get the wallet. The wallet address is the one they are asking, and starts with 0x.
+You actually can create wallets, you will receive the wallets in the messages when created or get the wallet.
 
 Consider today's date is {date}.
 
@@ -418,7 +421,7 @@ class Agent:
         })
         print("Wallet created: ", result.inserted_id)
 
-        return {"wallet_id": wallet.id, "messages": [AIMessage(content=f"Wallet created: {wallet.id}")]}
+        return {"wallet_id": wallet.id, "messages": [AIMessage(content=f"Wallet created: {wallet.addresses[0].address_id}")]}
 
     def get_wallet(self, state: AgentState):
         """ Get wallet """
@@ -437,7 +440,7 @@ class Agent:
                 wallet = Wallet.fetch(wallet_document_id)
                 if wallet:
                     wallet_id = wallet.id
-                    return { "wallet_id": wallet_id, "messages": [AIMessage(content=f"Wallet found: {wallet_id}")] }
+                    return { "wallet_id": wallet_id, "messages": [AIMessage(content=f"Wallet found: {wallet.addresses[0]}")] }
         return { "wallet_id": wallet_id, "messages": [AIMessage(content=f"Wallet not found")] }
 
     def retrieve_wallet_data(self, state: AgentState):
