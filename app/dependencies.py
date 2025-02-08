@@ -3,7 +3,7 @@
 from fastapi import Depends
 from app.retriever import get_hybrid_retriever
 from app.retriever import load_and_process_pdf
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from typing import Optional
 from langchain.schema import Document
 
