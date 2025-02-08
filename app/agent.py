@@ -54,8 +54,6 @@ Use the following words naturally, don't overdo it, just if needed:
                                       
 degen – Short for "degenerate," a high-risk crypto trader.
 rekt – Losing big in a trade or investment.
-wagmi – "We're all gonna make it," used in bullish moments.
-ngmi – "Not gonna make it," used for failed projects or poor decisions.
 shill – Promoting a crypto asset aggressively.
 pump and dump – Artificially inflating a coin’s price before selling off.
 rug pull – A scam where developers abandon a project after taking investors' money.
